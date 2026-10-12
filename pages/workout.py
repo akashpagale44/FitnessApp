@@ -2,7 +2,18 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 from pathlib import Path
+
 from database import save_workout_log
+
+
+# =========================
+# CURRENT USER
+# =========================
+
+if "user_id" not in st.session_state:
+    st.session_state.user_id = 1
+
+user_id = st.session_state.user_id
 
 
 st.title("🏋️ Workout")
@@ -10,9 +21,9 @@ st.title("🏋️ Workout")
 st.write("Follow a workout plan and track your training.")
 
 
-# -------------------------
-# Get User Goal
-# -------------------------
+# =========================
+# GET USER GOAL
+# =========================
 
 connection = sqlite3.connect(
     Path("data") / "fitness.db"
@@ -24,11 +35,12 @@ cursor.execute("""
     SELECT fitness_goal
     FROM users
     WHERE id = ?
-""", (1,))
+""", (user_id,))
 
 user_goal = cursor.fetchone()
 
 connection.close()
+
 
 if user_goal:
     fitness_goal = user_goal[0]
@@ -36,11 +48,12 @@ else:
     fitness_goal = "Build Muscle"
 
 
-# -------------------------
-# Recommended Workout Plan
-# -------------------------
+# =========================
+# RECOMMENDED WORKOUT PLAN
+# =========================
 
 st.subheader("📋 Recommended Workout Plan")
+
 
 if fitness_goal == "Build Muscle":
 
@@ -91,9 +104,9 @@ st.dataframe(
 )
 
 
-# -------------------------
-# Log Workout
-# -------------------------
+# =========================
+# LOG WORKOUT
+# =========================
 
 st.subheader("📝 Log Workout")
 
@@ -113,26 +126,33 @@ exercise_name = st.selectbox(
     ]
 )
 
+
 sets = st.number_input(
     "Sets",
     min_value=1,
     max_value=10,
-    value=3
+    value=3,
+    step=1
 )
+
 
 reps = st.number_input(
     "Reps",
     min_value=1,
     max_value=50,
-    value=10
+    value=10,
+    step=1
 )
+
 
 weight = st.number_input(
     "Weight (kg)",
     min_value=0.0,
     max_value=500.0,
-    value=0.0
+    value=0.0,
+    step=0.5
 )
+
 
 notes = st.text_area(
     "Notes",
@@ -140,10 +160,14 @@ notes = st.text_area(
 )
 
 
-if st.button("Save Workout"):
+# =========================
+# SAVE WORKOUT
+# =========================
+
+if st.button("💾 Save Workout"):
 
     save_workout_log(
-        1,
+        user_id,
         exercise_name,
         sets,
         reps,
@@ -151,12 +175,14 @@ if st.button("Save Workout"):
         notes
     )
 
-    st.success("Workout saved successfully! 💪")
+    st.success(
+        f"{exercise_name} saved successfully! 💪"
+    )
 
 
-# -------------------------
-# Today's Workouts
-# -------------------------
+# =========================
+# TODAY'S WORKOUTS
+# =========================
 
 st.subheader("📋 Today's Workouts")
 
@@ -180,15 +206,21 @@ query = """
 workouts = pd.read_sql_query(
     query,
     connection,
-    params=(1,)
+    params=(user_id,)
 )
 
 connection.close()
 
 
+# =========================
+# DISPLAY WORKOUTS
+# =========================
+
 if workouts.empty:
 
-    st.info("No workouts logged today.")
+    st.info(
+        "No workouts logged today."
+    )
 
 else:
 
@@ -198,9 +230,10 @@ else:
         hide_index=True
     )
 
-    # -------------------------
-    # Workout Summary
-    # -------------------------
+
+    # =========================
+    # WORKOUT SUMMARY
+    # =========================
 
     total_sets = workouts["Sets"].sum()
     total_reps = workouts["Reps"].sum()
@@ -211,23 +244,30 @@ else:
         * workouts["Weight"]
     ).sum()
 
+
     st.subheader("📊 Today's Workout Summary")
 
     col1, col2, col3 = st.columns(3)
 
+
     with col1:
+
         st.metric(
             "Total Sets",
             int(total_sets)
         )
 
+
     with col2:
+
         st.metric(
             "Total Reps",
             int(total_reps)
         )
 
+
     with col3:
+
         st.metric(
             "Training Volume",
             f"{total_volume:.0f} kg"

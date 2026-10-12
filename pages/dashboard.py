@@ -12,25 +12,52 @@ from calculations import (
 )
 
 
-st.title("🏠 Dashboard")
+# =========================
+# PAGE SETTINGS
+# =========================
 
+st.set_page_config(
+    page_title="Fitness App - Dashboard",
+    page_icon="🏋️",
+    layout="wide"
+)
+
+
+# =========================
+# CURRENT USER
+# =========================
+
+# Temporary current-user system
+# Later we will replace this with proper login/profile selection.
+
+if "user_id" not in st.session_state:
+    st.session_state.user_id = 1
+
+user_id = st.session_state.user_id
+
+
+# =========================
+# TITLE
+# =========================
+
+st.title("🏠 Dashboard")
 st.write("Your personal fitness overview")
 
 
-# -------------------------
-# Get User
-# -------------------------
+# =========================
+# GET USER
+# =========================
 
-user = get_user(1)
+user = get_user(user_id)
 
 if user is None:
     st.error("Please create your profile first.")
     st.stop()
 
 
-# -------------------------
-# Calculate Targets
-# -------------------------
+# =========================
+# CALCULATE TARGETS
+# =========================
 
 bmr = calculate_bmr(
     user["weight"],
@@ -53,12 +80,12 @@ protein_target = calculate_protein_target(
     user["weight"]
 )
 
-workout_count = get_today_workout_count(1)
+workout_count = get_today_workout_count(user_id)
 
 
-# -------------------------
-# Today's Nutrition
-# -------------------------
+# =========================
+# TODAY'S NUTRITION
+# =========================
 
 connection = sqlite3.connect(
     Path("data") / "fitness.db"
@@ -66,14 +93,17 @@ connection = sqlite3.connect(
 
 cursor = connection.cursor()
 
-cursor.execute("""
+cursor.execute(
+    """
     SELECT
         COALESCE(SUM(calories), 0),
         COALESCE(SUM(protein), 0)
     FROM nutrition_logs
     WHERE user_id = ?
     AND date = DATE('now')
-""", (1,))
+    """,
+    (user_id,)
+)
 
 nutrition = cursor.fetchone()
 
@@ -93,9 +123,9 @@ protein_remaining = max(
 )
 
 
-# -------------------------
-# Weight Progress
-# -------------------------
+# =========================
+# WEIGHT PROGRESS
+# =========================
 
 connection = sqlite3.connect(
     Path("data") / "fitness.db"
@@ -109,10 +139,11 @@ weight_data = pd.read_sql_query(
     ORDER BY date
     """,
     connection,
-    params=(1,)
+    params=(user_id,)
 )
 
 connection.close()
+
 
 if weight_data.empty:
 
@@ -121,14 +152,23 @@ if weight_data.empty:
 
 else:
 
-    starting_weight = weight_data.iloc[0]["weight"]
-    latest_weight = weight_data.iloc[-1]["weight"]
+    starting_weight = float(
+        weight_data.iloc[0]["weight"]
+    )
 
-    if user["goal_weight"] != starting_weight:
+    latest_weight = float(
+        weight_data.iloc[-1]["weight"]
+    )
+
+    goal_weight = float(
+        user["goal_weight"]
+    )
+
+    if starting_weight != goal_weight:
 
         weight_progress = (
             (starting_weight - latest_weight)
-            / (starting_weight - user["goal_weight"])
+            / (starting_weight - goal_weight)
         ) * 100
 
         weight_progress = max(
@@ -137,23 +177,26 @@ else:
         )
 
     else:
+
         weight_progress = 100
 
 
-# -------------------------
-# Welcome
-# -------------------------
+# =========================
+# WELCOME
+# =========================
 
-st.subheader(f"👋 Welcome, {user['name']}!")
+st.subheader(
+    f"👋 Welcome, {user['name']}!"
+)
 
 st.write(
     f"Your current goal is **{user['fitness_goal']}**."
 )
 
 
-# -------------------------
-# Today's Overview
-# -------------------------
+# =========================
+# TODAY'S OVERVIEW
+# =========================
 
 st.subheader("📊 Today's Overview")
 
@@ -161,32 +204,32 @@ col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     st.metric(
-        "Calories",
+        "🔥 Calories",
         f"{calories_consumed:.0f} kcal"
     )
 
 with col2:
     st.metric(
-        "Protein",
+        "🥩 Protein",
         f"{protein_consumed:.1f} g"
     )
 
 with col3:
     st.metric(
-        "Current Weight",
+        "⚖️ Current Weight",
         f"{latest_weight:.1f} kg"
     )
 
 with col4:
     st.metric(
-        "Workouts",
+        "🏋️ Workouts",
         workout_count
     )
 
 
-# -------------------------
-# Daily Targets
-# -------------------------
+# =========================
+# DAILY TARGETS
+# =========================
 
 st.subheader("🎯 Daily Targets")
 
@@ -217,15 +260,46 @@ with col4:
     )
 
 
-# -------------------------
-# Goal Progress
-# -------------------------
+# =========================
+# DAILY PROGRESS
+# =========================
+
+st.subheader("📈 Today's Progress")
+
+calorie_progress = (
+    min(calories_consumed / calorie_target, 1.0)
+    if calorie_target > 0
+    else 0
+)
+
+protein_progress = (
+    min(protein_consumed / protein_target, 1.0)
+    if protein_target > 0
+    else 0
+)
+
+st.write(
+    f"🔥 Calories: **{calories_consumed:.0f} / "
+    f"{calorie_target} kcal**"
+)
+
+st.progress(calorie_progress)
+
+st.write(
+    f"🥩 Protein: **{protein_consumed:.1f} / "
+    f"{protein_target} g**"
+)
+
+st.progress(protein_progress)
+
+
+# =========================
+# WEIGHT GOAL
+# =========================
 
 st.subheader("🎯 Weight Goal Progress")
 
-st.progress(
-    weight_progress / 100
-)
+st.progress(weight_progress / 100)
 
 st.write(
     f"**{weight_progress:.0f}%** of your weight goal completed"
@@ -246,6 +320,7 @@ with col2:
     )
 
 with col3:
+
     remaining_weight = abs(
         latest_weight - user["goal_weight"]
     )
@@ -256,9 +331,9 @@ with col3:
     )
 
 
-# -------------------------
-# Body Information
-# -------------------------
+# =========================
+# FITNESS INFORMATION
+# =========================
 
 st.subheader("📋 Fitness Information")
 
@@ -278,14 +353,14 @@ with col2:
 
 with col3:
     st.metric(
-        "Activity",
+        "Activity Level",
         user["activity_level"]
     )
 
 
-# -------------------------
-# Weight Chart
-# -------------------------
+# =========================
+# WEIGHT CHART
+# =========================
 
 if not weight_data.empty:
 
@@ -299,25 +374,44 @@ if not weight_data.empty:
         weight_data.set_index("date")["weight"]
     )
 
+else:
 
-# -------------------------
-# Quick Tips
-# -------------------------
+    st.info(
+        "No weight history available yet. "
+        "Start logging your weight to see your progress chart."
+    )
+
+
+# =========================
+# TODAY'S FOCUS
+# =========================
 
 st.subheader("💡 Today's Focus")
 
-st.write(
-    f"🥩 Aim for **{protein_target} g** of protein today."
-)
+focus_col1, focus_col2 = st.columns(2)
 
-st.write(
-    f"🔥 You have approximately **{calories_remaining:.0f} kcal** remaining."
-)
+with focus_col1:
 
-st.write(
-    "💪 Stay consistent with your training and recovery."
-)
+    st.write(
+        f"🥩 Aim for **{protein_target:.0f} g** "
+        "of protein today."
+    )
 
-st.write(
-    "💧 Remember to stay hydrated throughout the day."
-)
+    st.write(
+        f"🔥 You have approximately "
+        f"**{calories_remaining:.0f} kcal** remaining."
+    )
+
+with focus_col2:
+
+    st.write(
+        "💪 Stay consistent with your training."
+    )
+
+    st.write(
+        "💧 Remember to stay hydrated."
+    )
+
+    st.write(
+        "😴 Give your body enough time to recover."
+    )

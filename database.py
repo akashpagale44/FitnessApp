@@ -176,8 +176,18 @@ def get_today_workout_count(user_id):
 
     return count
 
-def get_food(food_name):
-    """Get nutrition information for a food."""
+
+def get_food(food_name, measurement_type="standard"):
+    """
+    Get nutrition information for a food.
+
+    Nutrition values are per 100 g.
+
+    measurement_type can be:
+    - standard
+    - raw
+    - cooked
+    """
 
     foods = {
         "egg": {
@@ -186,30 +196,63 @@ def get_food(food_name):
             "carbs": 1,
             "fats": 11
         },
+
         "rice": {
-            "calories": 130,
-            "protein": 2.7,
-            "carbs": 28,
-            "fats": 0.3
+            "standard": {
+                "calories": 130,
+                "protein": 2.7,
+                "carbs": 28,
+                "fats": 0.3
+            },
+            "raw": {
+                "calories": 365,
+                "protein": 7.1,
+                "carbs": 80,
+                "fats": 0.7
+            },
+            "cooked": {
+                "calories": 130,
+                "protein": 2.7,
+                "carbs": 28,
+                "fats": 0.3
+            }
         },
+
         "chicken breast": {
-            "calories": 165,
-            "protein": 31,
-            "carbs": 0,
-            "fats": 3.6
+            "standard": {
+                "calories": 165,
+                "protein": 31,
+                "carbs": 0,
+                "fats": 3.6
+            },
+            "raw": {
+                "calories": 120,
+                "protein": 22.5,
+                "carbs": 0,
+                "fats": 2.6
+            },
+            "cooked": {
+                "calories": 165,
+                "protein": 31,
+                "carbs": 0,
+                "fats": 3.6
+            }
         },
+
         "milk": {
             "calories": 61,
             "protein": 3.2,
             "carbs": 4.8,
             "fats": 3.3
         },
+
         "oats": {
             "calories": 389,
             "protein": 16.9,
             "carbs": 66,
             "fats": 6.9
         },
+
         "banana": {
             "calories": 89,
             "protein": 1.1,
@@ -218,9 +261,20 @@ def get_food(food_name):
         }
     }
 
-    return foods.get(food_name.lower())
+    food = foods.get(food_name.lower())
 
-    return foods.get(food_name.lower())
+    if food is None:
+        return None
+
+    # Foods without raw/cooked options
+    if "calories" in food:
+        return food
+
+    # Foods with raw/cooked options
+    return food.get(
+        measurement_type.lower(),
+        food["standard"]
+    )
 
 
 def save_nutrition_log(
@@ -263,6 +317,7 @@ def save_nutrition_log(
 
     connection.commit()
     connection.close()
+
 
 def save_workout_log(
     user_id,

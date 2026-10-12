@@ -1,54 +1,59 @@
+
 def calculate_bmr(weight, height, age, gender):
-    """
-    Calculate Basal Metabolic Rate (BMR)
-    using the Mifflin-St Jeor equation.
-    """
+    """Calculate Basal Metabolic Rate using the Mifflin-St Jeor equation."""
+    gender = str(gender).strip().lower()
 
-    if gender == "Male":
-        bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5
+    if gender in ("male", "m"):
+        return round(10 * weight + 6.25 * height - 5 * age + 5)
+    elif gender in ("female", "f"):
+        return round(10 * weight + 6.25 * height - 5 * age - 161)
     else:
-        bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161
+        return round(10 * weight + 6.25 * height - 5 * age + 5)
 
-    return round(bmr)
-
-def get_activity_multiplier(activity_level):
-    """Return the activity multiplier."""
-
-    multipliers = {
-        "Sedentary": 1.2,
-        "Lightly Active": 1.375,
-        "Moderately Active": 1.55,
-        "Very Active": 1.725
-    }
-
-    return multipliers.get(activity_level, 1.2)
 
 def calculate_tdee(bmr, activity_level):
-    """Calculate Total Daily Energy Expenditure (TDEE)."""
+    """Estimate daily calorie expenditure based on activity level."""
+    activity_level = str(activity_level).strip().lower()
 
-    multiplier = get_activity_multiplier(activity_level)
+    activity_multipliers = {
+        "sedentary": 1.2,
+        "lightly active": 1.375,
+        "moderately active": 1.55,
+        "very active": 1.725,
+        "extra active": 1.9,
+    }
 
-    tdee = bmr * multiplier
+    multiplier = activity_multipliers.get(activity_level, 1.2)
+    return round(bmr * multiplier)
 
-    return round(tdee)
 
 def calculate_calorie_target(tdee, fitness_goal):
-    """Calculate daily calorie target based on the fitness goal."""
+    """Estimate daily calorie target based on the fitness goal."""
+    goal = str(fitness_goal).strip().lower()
 
-    if fitness_goal == "Lose Fat":
-        calories = tdee - 400
+    if goal in ("build muscle", "muscle gain", "gain muscle", "bulk"):
+        return round(tdee + 250)
 
-    elif fitness_goal == "Build Muscle":
-        calories = tdee + 250
+    elif goal in ("lose weight", "weight loss", "fat loss", "cut"):
+        return round(tdee - 400)
 
     else:
-        calories = tdee
+        return round(tdee)
 
-    return round(calories)
 
-def calculate_protein_target(weight):
-    """Calculate daily protein target based on body weight."""
+def calculate_protein_target(weight, fitness_goal=None):
+    """Estimate daily protein target in grams."""
+    if fitness_goal is None:
+        return round(weight * 1.6)
 
-    protein = weight * 1.6
+    goal = str(fitness_goal).strip().lower()
 
-    return round(protein)
+    if goal in ("build muscle", "muscle gain", "gain muscle", "bulk"):
+        return round(weight * 1.8)
+
+    elif goal in ("lose weight", "weight loss", "fat loss", "cut"):
+        return round(weight * 2.0)
+
+    else:
+        return round(weight * 1.6)
+
