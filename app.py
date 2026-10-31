@@ -1,4 +1,5 @@
 import sqlite3
+import json
 from datetime import datetime, timedelta
 
 import streamlit as st
@@ -16,6 +17,7 @@ from database import (
     create_auth_session,
     get_user_by_session_token,
     revoke_auth_session,
+    get_connection,
 )
 
 st.set_page_config(
@@ -127,6 +129,90 @@ if st.session_state.get("authenticated", False):
     )
 
     st.success("You are logged in successfully.")
+
+    # TEMPORARY: Restore personal fitness history from a JSON export.
+    st.divider()
+    st.subheader("Restore My Fitness History")
+    uploaded_history = st.file_uploader(
+        "Upload your fitness history export",
+        type=["json"],
+        key="fitness_history_restore_upload"
+    )
+
+    if uploaded_history is not None:
+        if st.button("Restore Fitness History", type="primary"):
+            try:
+                backup = json.loads(uploaded_history.getvalue().decode("utf-8"))
+
+                expected_tables = {
+                    "nutrition_logs": [
+                        "date", "food_name", "quantity", "calories",
+                        "protein", "carbs", "fats", "fibre"
+                    ],
+                    "weight_logs": ["date", "weight"],
+                    "workout_logs": [
+                        "date", "exercise_name", "sets", "reps",
+                        "weight", "notes"
+                    ],
+                }
+
+                if not isinstance(backup.get("profile"), dict):
+                    raise ValueError("The export has no valid profile.")
+                if (
+                    backup["profile"].get("name", "").strip().lower()
+                    != st.session_state.get("user_name", "").strip().lower()
+                    or backup["profile"].get("email", "").strip().lower()
+                    != st.session_state.get("user_email", "").strip().lower()
+                ):
+                    raise ValueError("The exported profile name or email does not match the logged-in account.")
+                if any(not isinstance(backup.get(t), list) for t in expected_tables):
+                    raise ValueError("The export is missing one or more record lists.")
+
+                user_id = st.session_state.user_id
+                added = {}
+                skipped = {}
+
+                with get_connection() as con:
+                    for table, columns in expected_tables.items():
+                        existing = {
+                            tuple(row)
+                            for row in con.execute(
+                                f"SELECT {', '.join(columns)} FROM {table} WHERE user_id = ?",
+                                (user_id,)
+                            ).fetchall()
+                        }
+
+                        added[table] = 0
+                        skipped[table] = 0
+
+                        for record in backup[table]:
+                            if not isinstance(record, dict) or any(c not in record for c in columns):
+                                raise ValueError(f"An invalid record was found in {table}.")
+
+                            values = tuple(record[c] for c in columns)
+
+                            if values in existing:
+                                skipped[table] += 1
+                                continue
+
+                            placeholders = ", ".join("?" for _ in columns)
+                            con.execute(
+                                f"INSERT INTO {table} (user_id, {', '.join(columns)}) VALUES (?, {placeholders})",
+                                (user_id, *values)
+                            )
+                            existing.add(values)
+                            added[table] += 1
+
+                st.success("Fitness history restore completed.")
+                for table in expected_tables:
+                    st.write(
+                        f"{table}: {added[table]} added, "
+                        f"{skipped[table]} already present"
+                    )
+
+            except Exception as error:
+                st.error(f"Restore failed: {error}")
+
 
     st.info(
         "Use the pages listed in the sidebar to access your "
