@@ -1,8 +1,10 @@
-import sqlite3
+﻿import sqlite3
 from datetime import datetime, timedelta
 
 import streamlit as st
 import extra_streamlit_components as stx
+
+from initialize_library import initialize_library
 
 from database import (
     create_database,
@@ -22,7 +24,7 @@ st.set_page_config(
     layout="wide"
 )
 
-create_database()
+initialize_library()
 
 # -------------------------
 # PERSISTENT LOGIN COOKIES
@@ -363,3 +365,4 @@ else:
                         st.error(
                             "Could not connect the profile. Please try again."
                         )
+
