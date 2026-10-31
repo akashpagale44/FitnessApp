@@ -11,7 +11,7 @@ def initialize_library():
     connection = get_connection()
 
     try:
-        # Safely add the fibre column if an older database does not have it.
+        # Add fibre to foods if it is missing.
         food_columns = {
             row[1]
             for row in connection.execute(
@@ -23,8 +23,23 @@ def initialize_library():
             connection.execute(
                 "ALTER TABLE foods ADD COLUMN fibre REAL"
             )
-            connection.commit()
             print("Added missing fibre column to foods table.")
+
+        # Add fibre to nutrition logs if it is missing.
+        log_columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info(nutrition_logs)"
+            ).fetchall()
+        }
+
+        if "fibre" not in log_columns:
+            connection.execute(
+                "ALTER TABLE nutrition_logs ADD COLUMN fibre REAL"
+            )
+            print("Added missing fibre column to nutrition_logs table.")
+
+        connection.commit()
 
         food_tables_exist = connection.execute("""
             SELECT COUNT(*)
