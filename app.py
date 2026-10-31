@@ -1,4 +1,4 @@
-﻿import sqlite3
+import sqlite3
 from datetime import datetime, timedelta
 
 import streamlit as st
@@ -45,6 +45,7 @@ if st.sidebar.button("Check cloud accounts"):
 
         st.subheader("Cloud account check")
         st.write("Total accounts:", len(_diag_rows))
+        st.write("Cloud account emails:", [row[0] for row in _diag_rows])
         st.write(
             "Original account found:",
             "akashpagale44@gmail.com" in _diag_emails
