@@ -26,6 +26,38 @@ st.set_page_config(
 
 initialize_library()
 
+# CLOUD ACCOUNT DIAGNOSTIC - TEMPORARY
+import sqlite3 as _diag_sqlite3
+
+if st.sidebar.button("Check cloud accounts"):
+    try:
+        _diag_conn = _diag_sqlite3.connect("data/fitness.db")
+        _diag_rows = _diag_conn.execute(
+            "SELECT email FROM users"
+        ).fetchall()
+        _diag_conn.close()
+
+        _diag_emails = {
+            str(row[0]).strip().lower()
+            for row in _diag_rows
+            if row[0]
+        }
+
+        st.subheader("Cloud account check")
+        st.write("Total accounts:", len(_diag_rows))
+        st.write(
+            "Original account found:",
+            "akashpagale44@gmail.com" in _diag_emails
+        )
+        st.write(
+            "Account records are present:",
+            len(_diag_rows) > 0
+        )
+    except Exception as _diag_error:
+        st.error("Diagnostic error: " + str(_diag_error))
+# END CLOUD ACCOUNT DIAGNOSTIC
+
+
 # -------------------------
 # PERSISTENT LOGIN COOKIES
 # -------------------------
