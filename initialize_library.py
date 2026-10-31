@@ -11,6 +11,21 @@ def initialize_library():
     connection = get_connection()
 
     try:
+        # Safely add the fibre column if an older database does not have it.
+        food_columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info(foods)"
+            ).fetchall()
+        }
+
+        if "fibre" not in food_columns:
+            connection.execute(
+                "ALTER TABLE foods ADD COLUMN fibre REAL"
+            )
+            connection.commit()
+            print("Added missing fibre column to foods table.")
+
         food_tables_exist = connection.execute("""
             SELECT COUNT(*)
             FROM sqlite_master
