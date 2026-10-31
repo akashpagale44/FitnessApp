@@ -74,5 +74,29 @@ def initialize_library():
         )
 
 
+    # Correct the verified Anuvaad boiled-egg record (ASC056).
+    # Only the per-100 g values in foods are updated.
+    connection = get_connection()
+    try:
+        connection.execute("""
+            UPDATE foods
+            SET calories = 155.0,
+                protein = 12.58,
+                carbs = 1.12,
+                fats = 10.61,
+                fibre = 0.0
+            WHERE id = (
+                SELECT food_id
+                FROM food_external_sources
+                WHERE source_name = 'Anuvaad INDB'
+                  AND external_id = 'ASC056'
+                LIMIT 1
+            )
+        """)
+        connection.commit()
+    finally:
+        connection.close()
+
+
 if __name__ == "__main__":
     initialize_library()
