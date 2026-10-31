@@ -1,3 +1,4 @@
+from auth import restore_login_session
 
 import sqlite3
 from pathlib import Path
@@ -14,8 +15,11 @@ import streamlit as st
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASE_PATH = BASE_DIR / "data" / "fitness.db"
 
-if "user_id" not in st.session_state:
-    st.session_state.user_id = 1
+restore_login_session()
+
+if not st.session_state.get("authenticated", False) or "user_id" not in st.session_state:
+    st.warning("Please log in to access this page.")
+    st.stop()
 
 user_id = st.session_state.user_id
 

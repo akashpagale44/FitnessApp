@@ -1,17 +1,22 @@
+from auth import restore_login_session
+
 import streamlit as st
 import sqlite3
 import pandas as pd
 from pathlib import Path
 
-from database import save_workout_log
+from database import save_workout_log, get_exercise_library
 
 
 # =========================
 # CURRENT USER
 # =========================
 
-if "user_id" not in st.session_state:
-    st.session_state.user_id = 1
+restore_login_session()
+
+if not st.session_state.get("authenticated", False) or "user_id" not in st.session_state:
+    st.warning("Please log in to access this page.")
+    st.stop()
 
 user_id = st.session_state.user_id
 
@@ -97,10 +102,13 @@ plan_data = pd.DataFrame(
     columns=["Day", "Workout"]
 )
 
-st.dataframe(
-    plan_data,
-    use_container_width=True,
-    hide_index=True
+st.markdown(
+    "| Day | Workout |\n"
+    "|---|---|\n"
+    + "\n".join(
+        "| " + day + " | " + workout + " |"
+        for day, workout in workout_plan.items()
+    )
 )
 
 
@@ -110,74 +118,79 @@ st.dataframe(
 
 st.subheader("📝 Log Workout")
 
-exercise_name = st.selectbox(
-    "Exercise",
-    [
-        "Bench Press",
-        "Squat",
-        "Deadlift",
-        "Lat Pulldown",
-        "Barbell Row",
-        "Shoulder Press",
-        "Bicep Curl",
-        "Tricep Pushdown",
-        "Leg Press",
-        "Lateral Raise"
-    ]
-)
+# Load exercise names from the SQLite exercise library
+exercises = get_exercise_library()
+
+exercise_names = [
+    exercise["name"] for exercise in exercises
+]
 
 
-sets = st.number_input(
-    "Sets",
-    min_value=1,
-    max_value=10,
-    value=3,
-    step=1
-)
+if not exercise_names:
 
-
-reps = st.number_input(
-    "Reps",
-    min_value=1,
-    max_value=50,
-    value=10,
-    step=1
-)
-
-
-weight = st.number_input(
-    "Weight (kg)",
-    min_value=0.0,
-    max_value=500.0,
-    value=0.0,
-    step=0.5
-)
-
-
-notes = st.text_area(
-    "Notes",
-    placeholder="Optional notes about this exercise..."
-)
-
-
-# =========================
-# SAVE WORKOUT
-# =========================
-
-if st.button("💾 Save Workout"):
-
-    save_workout_log(
-        user_id,
-        exercise_name,
-        sets,
-        reps,
-        weight,
-        notes
+    st.warning(
+        "No exercises are currently available in the exercise library."
     )
 
-    st.success(
-        f"{exercise_name} saved successfully! 💪"
+else:
+
+    exercise_name = st.selectbox(
+        "Exercise",
+        exercise_names
     )
+
+
+    sets = st.number_input(
+        "Sets",
+        min_value=1,
+        max_value=10,
+        value=3,
+        step=1
+    )
+
+
+    reps = st.number_input(
+        "Reps",
+        min_value=1,
+        max_value=50,
+        value=10,
+        step=1
+    )
+
+
+    weight = st.number_input(
+        "Weight (kg)",
+        min_value=0.0,
+        max_value=500.0,
+        value=0.0,
+        step=0.5
+    )
+
+
+    notes = st.text_area(
+        "Notes",
+        placeholder="Optional notes about this exercise..."
+    )
+
+
+    # =========================
+    # SAVE WORKOUT
+    # =========================
+
+    if st.button("💾 Save Workout"):
+
+        save_workout_log(
+            user_id,
+            exercise_name,
+            sets,
+            reps,
+            weight,
+            notes
+        )
+
+        st.success(
+            f"{exercise_name} saved successfully! 💪"
+        )
 
 
 # =========================

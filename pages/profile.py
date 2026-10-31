@@ -1,3 +1,4 @@
+from auth import restore_login_session
 import streamlit as st
 import sqlite3
 
@@ -13,8 +14,11 @@ st.write("Manage your personal fitness information.")
 # CURRENT USER
 # =========================
 
-if "user_id" not in st.session_state:
-    st.session_state.user_id = 1
+restore_login_session()
+
+if not st.session_state.get("authenticated", False) or "user_id" not in st.session_state:
+    st.warning("Please log in to access this page.")
+    st.stop()
 
 user_id = st.session_state.user_id
 

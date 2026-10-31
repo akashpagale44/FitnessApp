@@ -1,5 +1,16 @@
+# Python environment and cache
 venv/
 __pycache__/
 *.pyc
-data/fitness.db
+
+# SQLite databases and backups
+*.db
+*.sqlite
+*.sqlite3
+backups/
+
+# Old backup files
+*.bak
+
+# Streamlit secrets
 .streamlit/secrets.toml
