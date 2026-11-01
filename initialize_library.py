@@ -5,13 +5,17 @@ from database import create_database, get_connection
 from import_indb import main as import_food_library
 
 
+def run_project_script(filename):
+    script_path = Path(__file__).resolve().parent / filename
+    runpy.run_path(str(script_path), run_name="__main__")
+
+
 def initialize_library():
     create_database()
 
     connection = get_connection()
 
     try:
-        # Add fibre to foods if it is missing.
         food_columns = {
             row[1]
             for row in connection.execute(
@@ -25,7 +29,6 @@ def initialize_library():
             )
             print("Added missing fibre column to foods table.")
 
-        # Add fibre to nutrition logs if it is missing.
         log_columns = {
             row[1]
             for row in connection.execute(
@@ -67,15 +70,15 @@ def initialize_library():
         import_food_library()
 
     if exercise_count == 0:
-        print("Initializing exercise library...")
-        runpy.run_path(
-            str(Path(__file__).resolve().parent / "seed_exercises.py"),
-            run_name="__main__"
-        )
+        print("Initializing original exercise library...")
+        run_project_script("seed_exercises.py")
 
+    print("Ensuring expanded exercise library...")
+    run_project_script("add_more_exercises.py")
 
-    # Correct the verified Anuvaad boiled-egg record (ASC056).
-    # Only the per-100 g values in foods are updated.
+    print("Applying detailed exercise guidance...")
+    run_project_script("update_exercise_guidance.py")
+
     connection = get_connection()
     try:
         connection.execute("""
@@ -96,6 +99,8 @@ def initialize_library():
         connection.commit()
     finally:
         connection.close()
+
+    print("Library initialization completed.")
 
 
 if __name__ == "__main__":

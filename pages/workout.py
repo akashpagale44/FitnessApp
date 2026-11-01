@@ -139,6 +139,29 @@ else:
         exercise_names
     )
 
+    selected_exercise = next(
+        exercise for exercise in exercises
+        if exercise["name"] == exercise_name
+    )
+
+    with st.expander("?? Exercise Guide", expanded=False):
+        st.write(
+            f"**Equipment:** {selected_exercise.get('equipment') or 'Not specified'}"
+        )
+        st.write(
+            f"**Difficulty:** {selected_exercise.get('difficulty') or 'Not specified'}"
+        )
+
+        if selected_exercise.get("description"):
+            st.write(selected_exercise["description"])
+
+        if selected_exercise.get("instructions"):
+            st.markdown("**How to perform:**")
+            st.text(selected_exercise["instructions"])
+
+        if selected_exercise.get("common_mistakes"):
+            st.markdown("**Common mistakes to avoid:**")
+            st.text(selected_exercise["common_mistakes"])
 
     sets = st.number_input(
         "Sets",
