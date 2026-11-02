@@ -11,9 +11,28 @@ def run_project_script(filename):
 
 
 def initialize_library():
-    print('INIT_DIAG: before create_database', flush=True)
-    create_database()
-    print('INIT_DIAG: after create_database', flush=True)
+    connection = get_connection()
+    try:
+        existing_tables = {
+            row[0] for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        required_tables = {
+            "users", "auth_sessions", "nutrition_logs", "workout_logs",
+            "weight_logs", "quiz_logs", "food_categories", "foods",
+            "muscle_groups", "exercises", "exercise_muscles",
+            "food_external_sources", "food_nutrition_details"
+        }
+        schema_ready = required_tables.issubset(existing_tables)
+    finally:
+        connection.close()
+
+    if schema_ready:
+        print("Database schema already exists. Skipping table creation.", flush=True)
+    else:
+        print("Database schema incomplete. Initializing tables.", flush=True)
+        create_database()
 
     connection = get_connection()
 
