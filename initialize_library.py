@@ -11,7 +11,9 @@ def run_project_script(filename):
 
 
 def initialize_library():
+    print('INIT_DIAG: before create_database', flush=True)
     create_database()
+    print('INIT_DIAG: after create_database', flush=True)
 
     connection = get_connection()
 
@@ -62,9 +64,20 @@ def initialize_library():
             "SELECT COUNT(*) FROM exercises"
         ).fetchone()[0]
 
+        missing_guidance_count = connection.execute("""
+            SELECT COUNT(*)
+            FROM exercises
+            WHERE is_active = 1
+              AND (
+                  instructions IS NULL OR TRIM(instructions) = ''
+                  OR common_mistakes IS NULL OR TRIM(common_mistakes) = ''
+              )
+        """).fetchone()[0]
+
     finally:
         connection.close()
 
+    print(f'INIT_DIAG: foods={food_count}, exercises={exercise_count}, missing_guidance={missing_guidance_count}', flush=True)
     if not food_tables_exist or food_count == 0:
         print("Initializing food library...")
         import_food_library()
@@ -73,11 +86,17 @@ def initialize_library():
         print("Initializing original exercise library...")
         run_project_script("seed_exercises.py")
 
-    print("Ensuring expanded exercise library...")
-    run_project_script("add_more_exercises.py")
+    if exercise_count < 53:
+        print("Ensuring expanded exercise library...")
+        run_project_script("add_more_exercises.py")
+    else:
+        print("Exercise library already populated. Skipping expansion.")
 
-    print("Applying detailed exercise guidance...")
-    run_project_script("update_exercise_guidance.py")
+    if missing_guidance_count > 0:
+        print("Applying detailed exercise guidance...")
+        run_project_script("update_exercise_guidance.py")
+    else:
+        print("Exercise guidance already complete. Skipping updates.")
 
     connection = get_connection()
     try:
@@ -105,3 +124,4 @@ def initialize_library():
 
 if __name__ == "__main__":
     initialize_library()
+
