@@ -536,18 +536,21 @@ def register_user(
 
 def authenticate_user(email, password):
     if not email or not password:
+        print("LOGIN_DIAG: credentials_supplied=False")
         return None
 
     user = get_user_by_email(email.strip())
+    user_found = user is not None
+    hash_present = bool(user and user["password_hash"])
+    password_match = bool(
+        hash_present and _verify_password(password, user["password_hash"])
+    )
 
-    if not user or not user["password_hash"]:
-        return None
-
-    if _verify_password(password, user["password_hash"]):
-        return user
-
-    return None
-
+    print(
+        f"LOGIN_DIAG: user_found={user_found}, "
+        f"hash_present={hash_present}, password_match={password_match}"
+    )
+    return user if password_match else None
 
 # PERSISTENT LOGIN SESSION FUNCTIONS
 # ============================================================
