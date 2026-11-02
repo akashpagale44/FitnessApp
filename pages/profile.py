@@ -1,11 +1,11 @@
-from auth import restore_login_session
+﻿from auth import restore_login_session
 import streamlit as st
-import sqlite3
-
-from database import get_user
 
 
-st.title("👤 Profile")
+from database import get_user, get_connection
+
+
+st.title("Profile")
 
 st.write("Manage your personal fitness information.")
 
@@ -38,7 +38,7 @@ if not user:
 # CURRENT PROFILE
 # =========================
 
-st.subheader("📋 Current Profile")
+st.subheader("Current Profile")
 
 col1, col2, col3 = st.columns(3)
 
@@ -64,7 +64,7 @@ st.divider()
 # UPDATE PROFILE
 # =========================
 
-st.subheader("✏️ Update Profile")
+st.subheader("Update Profile")
 
 name = st.text_input(
     "Name",
@@ -158,14 +158,14 @@ activity_level = st.selectbox(
 # SAVE CHANGES
 # =========================
 
-if st.button("💾 Save Changes", type="primary"):
+if st.button("Save Changes", type="primary"):
 
     if name.strip() == "":
         st.error("Please enter your name.")
 
     else:
 
-        connection = sqlite3.connect("data/fitness.db")
+        connection = get_connection()
         cursor = connection.cursor()
 
         cursor.execute("""
@@ -194,6 +194,8 @@ if st.button("💾 Save Changes", type="primary"):
         connection.commit()
         connection.close()
 
-        st.success("Profile updated successfully! 🎉")
+        st.success("Profile updated successfully!")
 
         st.rerun()
+
+
