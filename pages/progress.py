@@ -1,7 +1,7 @@
 from auth import restore_login_session
+from database import get_connection
 
 import sqlite3
-from pathlib import Path
 from datetime import date
 
 import pandas as pd
@@ -12,9 +12,6 @@ import streamlit as st
 # DATABASE AND CURRENT USER
 # =========================
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-DATABASE_PATH = BASE_DIR / "data" / "fitness.db"
-
 restore_login_session()
 
 if not st.session_state.get("authenticated", False) or "user_id" not in st.session_state:
@@ -22,13 +19,6 @@ if not st.session_state.get("authenticated", False) or "user_id" not in st.sessi
     st.stop()
 
 user_id = st.session_state.user_id
-
-
-def get_connection():
-    """Connect to the fitness database."""
-    connection = sqlite3.connect(DATABASE_PATH)
-    connection.row_factory = sqlite3.Row
-    return connection
 
 
 st.title("📈 Progress")
@@ -124,15 +114,20 @@ st.subheader("📊 Weight Progress")
 connection = get_connection()
 
 try:
-    weight_data = pd.read_sql_query(
+    cursor = connection.execute(
         """
         SELECT id, date, weight
         FROM weight_logs
         WHERE user_id = ?
         ORDER BY date ASC, id ASC
         """,
-        connection,
-        params=(user_id,)
+        (user_id,)
+    )
+    columns = [column[0] for column in cursor.description]
+    weight_rows = cursor.fetchall()
+    weight_data = pd.DataFrame(
+        [tuple(row) for row in weight_rows],
+        columns=columns
     )
 finally:
     connection.close()
