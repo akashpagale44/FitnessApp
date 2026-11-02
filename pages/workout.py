@@ -1,11 +1,11 @@
-from auth import restore_login_session
+﻿from auth import restore_login_session
 
 import streamlit as st
 import sqlite3
 import pandas as pd
 from pathlib import Path
 
-from database import save_workout_log, get_exercise_library
+from database import save_workout_log, get_exercise_library, get_connection
 
 
 # =========================
@@ -21,7 +21,7 @@ if not st.session_state.get("authenticated", False) or "user_id" not in st.sessi
 user_id = st.session_state.user_id
 
 
-st.title("🏋️ Workout")
+st.title("Workout")
 
 st.write("Follow a workout plan and track your training.")
 
@@ -30,9 +30,7 @@ st.write("Follow a workout plan and track your training.")
 # GET USER GOAL
 # =========================
 
-connection = sqlite3.connect(
-    Path("data") / "fitness.db"
-)
+connection = get_connection()
 
 cursor = connection.cursor()
 
@@ -57,7 +55,7 @@ else:
 # RECOMMENDED WORKOUT PLAN
 # =========================
 
-st.subheader("📋 Recommended Workout Plan")
+st.subheader("Recommended Workout Plan")
 
 
 if fitness_goal == "Build Muscle":
@@ -116,7 +114,7 @@ st.markdown(
 # LOG WORKOUT
 # =========================
 
-st.subheader("📝 Log Workout")
+st.subheader("Log Workout")
 
 # Load exercise names from the SQLite exercise library
 exercises = get_exercise_library()
@@ -144,7 +142,7 @@ else:
         if exercise["name"] == exercise_name
     )
 
-    with st.expander("?? Exercise Guide", expanded=False):
+    with st.expander("Exercise Guide", expanded=False):
         st.write(
             f"**Equipment:** {selected_exercise.get('equipment') or 'Not specified'}"
         )
@@ -200,7 +198,7 @@ else:
     # SAVE WORKOUT
     # =========================
 
-    if st.button("💾 Save Workout"):
+    if st.button("Save Workout"):
 
         save_workout_log(
             user_id,
@@ -212,7 +210,7 @@ else:
         )
 
         st.success(
-            f"{exercise_name} saved successfully! 💪"
+            f"{exercise_name} saved successfully!"
         )
 
 
@@ -220,11 +218,9 @@ else:
 # TODAY'S WORKOUTS
 # =========================
 
-st.subheader("📋 Today's Workouts")
+st.subheader("Today's Workouts")
 
-connection = sqlite3.connect(
-    Path("data") / "fitness.db"
-)
+connection = get_connection()
 
 query = """
     SELECT
@@ -239,13 +235,16 @@ query = """
     ORDER BY id DESC
 """
 
-workouts = pd.read_sql_query(
-    query,
-    connection,
-    params=(user_id,)
-)
-
-connection.close()
+try:
+    cursor = connection.execute(query, (user_id,))
+    columns = [column[0] for column in cursor.description]
+    workout_rows = cursor.fetchall()
+    workouts = pd.DataFrame(
+        [tuple(row) for row in workout_rows],
+        columns=columns
+    )
+finally:
+    connection.close()
 
 
 # =========================
@@ -281,7 +280,7 @@ else:
     ).sum()
 
 
-    st.subheader("📊 Today's Workout Summary")
+    st.subheader("Today's Workout Summary")
 
     col1, col2, col3 = st.columns(3)
 
@@ -308,3 +307,6 @@ else:
             "Training Volume",
             f"{total_volume:.0f} kg"
         )
+
+
+
