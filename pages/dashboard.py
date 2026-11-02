@@ -1,10 +1,8 @@
 from auth import restore_login_session
 import streamlit as st
-import sqlite3
 import pandas as pd
-from pathlib import Path
 
-from database import get_user, get_today_workout_count
+from database import get_user, get_today_workout_count, get_connection
 from calculations import (
     calculate_bmr,
     calculate_tdee,
@@ -22,7 +20,6 @@ st.set_page_config(
     layout="wide"
 )
 
-DB_PATH = Path("data") / "fitness.db"
 
 
 # =========================
@@ -89,7 +86,7 @@ workout_count = get_today_workout_count(user_id)
 # TODAY'S NUTRITION
 # =========================
 
-connection = sqlite3.connect(DB_PATH)
+connection = get_connection()
 
 try:
     cursor = connection.cursor()
@@ -129,18 +126,23 @@ protein_remaining = max(
 # WEIGHT HISTORY
 # =========================
 
-connection = sqlite3.connect(DB_PATH)
+connection = get_connection()
 
 try:
-    weight_data = pd.read_sql_query(
+    cursor = connection.cursor()
+    cursor.execute(
         """
         SELECT date, weight
         FROM weight_logs
         WHERE user_id = ?
         ORDER BY date
         """,
-        connection,
-        params=(user_id,)
+        (user_id,)
+    )
+    weight_rows = cursor.fetchall()
+    weight_data = pd.DataFrame(
+        weight_rows,
+        columns=["date", "weight"]
     )
 finally:
     connection.close()
