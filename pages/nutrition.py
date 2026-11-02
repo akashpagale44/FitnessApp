@@ -4,7 +4,7 @@ import json
 import pandas as pd
 from pathlib import Path
 
-from database import get_user, save_nutrition_log
+from database import get_user, save_nutrition_log, get_connection
 from auth import restore_login_session
 from calculations import (
     calculate_bmr,
@@ -26,9 +26,9 @@ DB_PATH = Path(__file__).resolve().parent.parent / "data" / "fitness.db"
 # =========================
 
 def load_food_library():
-    with sqlite3.connect(DB_PATH) as connection:
-        connection.row_factory = sqlite3.Row
-        foods = connection.execute(
+    connection = get_connection()
+    try:
+        cursor = connection.execute(
             """
             SELECT
                 f.id,
@@ -56,9 +56,12 @@ def load_food_library():
             WHERE f.is_active = 1
             ORDER BY f.name COLLATE NOCASE, f.food_state
             """
-        ).fetchall()
-
-    return [dict(food) for food in foods]
+        )
+        columns = [column[0] for column in cursor.description]
+        foods = cursor.fetchall()
+        return [dict(zip(columns, tuple(food))) for food in foods]
+    finally:
+        connection.close()
 
 
 # =========================
@@ -435,37 +438,38 @@ if selected_food_id is not None:
 st.divider()
 st.subheader("Today's Nutrition")
 
+connection = get_connection()
 try:
-    with sqlite3.connect(DB_PATH) as connection:
-        totals = connection.execute(
-            """
-            SELECT
-                COALESCE(SUM(calories), 0),
-                COALESCE(SUM(protein), 0),
-                COALESCE(SUM(carbs), 0),
-                COALESCE(SUM(fats), 0),
-                SUM(fibre)
-            FROM nutrition_logs
-            WHERE user_id = ?
-              AND date = DATE('now', 'localtime')
-            """,
-            (user_id,),
-        ).fetchone()
+    totals = connection.execute(
+        """
+        SELECT
+            COALESCE(SUM(calories), 0),
+            COALESCE(SUM(protein), 0),
+            COALESCE(SUM(carbs), 0),
+            COALESCE(SUM(fats), 0),
+            SUM(fibre)
+        FROM nutrition_logs
+        WHERE user_id = ?
+          AND date = DATE('now', 'localtime')
+        """,
+        (user_id,),
+    ).fetchone()
 
-        rows = connection.execute(
-            """
-            SELECT id, food_name, quantity, calories, protein, carbs, fats, fibre
-            FROM nutrition_logs
-            WHERE user_id = ?
-              AND date = DATE('now', 'localtime')
-            ORDER BY id DESC
-            """,
-            (user_id,),
-        ).fetchall()
-
+    rows = connection.execute(
+        """
+        SELECT id, food_name, quantity, calories, protein, carbs, fats, fibre
+        FROM nutrition_logs
+        WHERE user_id = ?
+          AND date = DATE('now', 'localtime')
+        ORDER BY id DESC
+        """,
+        (user_id,),
+    ).fetchall()
 except sqlite3.Error as error:
     st.error(f"Could not load nutrition history: {error}")
     st.stop()
+finally:
+    connection.close()
 
 total_calories, total_protein, total_carbs, total_fats, total_fibre = totals
 
@@ -618,17 +622,17 @@ else:
         else:
             selected_id = row_options[selected_entry]
 
+            connection = get_connection()
             try:
-                with sqlite3.connect(DB_PATH) as connection:
-                    cursor = connection.execute(
-                        """
-                        DELETE FROM nutrition_logs
-                        WHERE id = ?
-                          AND user_id = ?
-                          AND date = DATE('now', 'localtime')
-                        """,
-                        (selected_id, user_id),
-                    )
+                cursor = connection.execute(
+                    """
+                    DELETE FROM nutrition_logs
+                    WHERE id = ?
+                      AND user_id = ?
+                      AND date = DATE('now', 'localtime')
+                    """,
+                    (selected_id, user_id),
+                )
 
                 if cursor.rowcount > 0:
                     st.success("Food entry deleted.")
@@ -638,3 +642,9 @@ else:
 
             except sqlite3.Error as error:
                 st.error(f"Could not delete entry: {error}")
+            finally:
+                connection.close()
+
+
+
+
