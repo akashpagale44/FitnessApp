@@ -11,13 +11,37 @@ DATABASE_PATH = Path(__file__).resolve().parent / "data" / "fitness.db"
 
 
 def get_connection():
-    """Create and return a database connection."""
-    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    """Connect to Turso when configured; otherwise use local SQLite."""
+    try:
+        import streamlit as st
+        turso_url = st.secrets["TURSO_DATABASE_URL"]
+        turso_token = st.secrets["TURSO_AUTH_TOKEN"]
+    except (ImportError, KeyError, FileNotFoundError):
+        turso_url = None
+        turso_token = None
 
+    if turso_url and turso_token:
+        import turso_serverless
+
+        connection = turso_serverless.connect(
+            turso_url,
+            auth_token=turso_token
+        )
+        class CompatibleRow(turso_serverless.Row):
+            def get(self, key, default=None):
+                try:
+                    return self[key]
+                except KeyError:
+                    return default
+
+        connection.row_factory = CompatibleRow
+        connection.execute("PRAGMA foreign_keys = ON")
+        return connection
+
+    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DATABASE_PATH)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
-
     return connection
 
 
@@ -1056,6 +1080,26 @@ def search_exercises(search_term):
     finally:
         connection.close()
 
+
+
+def get_all_exercise_muscles():
+    """Get muscle relationships for all exercises in one query."""
+    connection = get_connection()
+
+    try:
+        return connection.execute("""
+            SELECT
+                exercise_muscles.exercise_id,
+                muscle_groups.name,
+                exercise_muscles.role
+            FROM exercise_muscles
+            JOIN muscle_groups
+                ON exercise_muscles.muscle_group_id = muscle_groups.id
+            ORDER BY exercise_muscles.role
+        """).fetchall()
+
+    finally:
+        connection.close()
 
 def get_exercise_muscles(exercise_id):
     """Get primary and secondary muscles for an exercise."""
