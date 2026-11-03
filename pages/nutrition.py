@@ -25,6 +25,7 @@ DB_PATH = Path(__file__).resolve().parent.parent / "data" / "fitness.db"
 # LOAD FOOD LIBRARY FROM SQLITE
 # =========================
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_food_library():
     connection = get_connection()
     try:
