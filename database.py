@@ -1,4 +1,4 @@
-
+﻿
 import sqlite3
 from pathlib import Path
 
@@ -25,7 +25,8 @@ def get_connection():
 
         connection = turso_serverless.connect(
             turso_url,
-            auth_token=turso_token
+            auth_token=turso_token,
+            isolation_level=None
         )
         class CompatibleRow(turso_serverless.Row):
             def get(self, key, default=None):
@@ -105,10 +106,15 @@ def create_database():
             )
         """)
 
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id
-            ON auth_sessions(user_id)
-        """)
+        existing_index = cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND name=?",
+            ("idx_auth_sessions_user_id",)
+        ).fetchone()
+
+        if not existing_index:
+            cursor.execute(
+                "CREATE INDEX idx_auth_sessions_user_id ON auth_sessions(user_id)"
+            )
 
         # ---------------- NUTRITION LOGS ----------------
 
@@ -1161,3 +1167,6 @@ def save_nutrition_log(
 
     finally:
         connection.close()
+
+
+

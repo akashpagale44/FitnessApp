@@ -1,7 +1,7 @@
 
 import streamlit as st
 
-from database import get_exercise_library, get_exercise_muscles
+from database import get_exercise_library, get_all_exercise_muscles
 from exercise_api import search_online_exercises
 
 
@@ -26,12 +26,17 @@ st.header("Local Exercise Library")
 st.caption("Exercises stored in your Fitness App database.")
 
 exercises = get_exercise_library()
+all_muscle_rows = get_all_exercise_muscles()
+
+muscles_by_exercise = {}
+for row in all_muscle_rows:
+    muscles_by_exercise.setdefault(row["exercise_id"], []).append(row)
 
 exercise_data = []
 
 for exercise in exercises:
     item = dict(exercise)
-    muscle_rows = get_exercise_muscles(item["id"])
+    muscle_rows = muscles_by_exercise.get(item["id"], [])
 
     item["primary_muscles"] = [
         row["name"] for row in muscle_rows
@@ -48,7 +53,6 @@ for exercise in exercises:
     )
 
     exercise_data.append(item)
-
 
 st.subheader("Find an exercise")
 
@@ -230,115 +234,117 @@ if st.session_state.get("online_search_signature") != current_signature:
 offset = st.session_state.get("online_exercise_offset", 0)
 page_size = 20
 
-try:
-    with st.spinner("Searching the online exercise database..."):
-        online_result = search_online_exercises(
-            query=online_query,
-            muscle=online_muscle or None,
-            equipment=online_equipment or None,
-            limit=page_size,
-            offset=offset,
-            sort="preferred_rank",
+if online_query or online_muscle or online_equipment:
+    try:
+        with st.spinner("Searching the online exercise database..."):
+            online_result = search_online_exercises(
+                query=online_query,
+                muscle=online_muscle or None,
+                equipment=online_equipment or None,
+                limit=page_size,
+                offset=offset,
+                sort="preferred_rank",
+            )
+
+        online_exercises = online_result["data"]
+        total_online = online_result["total"]
+
+        st.caption(
+            f"Showing {len(online_exercises)} results on this page. "
+            f"Total matching online exercises: {total_online}"
         )
 
-    online_exercises = online_result["data"]
-    total_online = online_result["total"]
-
-    st.caption(
-        f"Showing {len(online_exercises)} results on this page. "
-        f"Total matching online exercises: {total_online}"
-    )
-
-    if not online_exercises:
-        st.info(
-            "No online exercises matched your search. "
-            "Try changing the search or filters."
-        )
-
-    for exercise in online_exercises:
-        name = exercise.get("name", "Unnamed exercise")
-
-        with st.expander(name):
-            primary = exercise.get("primary_muscle") or "Not specified"
-            secondary = exercise.get("secondary_muscles") or []
-            equipment = exercise.get("equipment") or []
-
-            col_a, col_b, col_c = st.columns(3)
-
-            col_a.metric("Primary muscle", primary.replace("_", " ").title())
-
-            col_b.metric(
-                "Movement pattern",
-                (exercise.get("pattern") or "Not specified")
-                .replace("_", " ").title(),
+        if not online_exercises:
+            st.info(
+                "No online exercises matched your search. "
+                "Try changing the search or filters."
             )
 
-            col_c.metric(
-                "Training category",
-                (exercise.get("modality") or "Not specified").title(),
-            )
+        for exercise in online_exercises:
+            name = exercise.get("name", "Unnamed exercise")
 
-            st.markdown(
-                "**Secondary muscles:** "
-                + (
-                    ", ".join(
-                        muscle.replace("_", " ").title()
-                        for muscle in secondary
+            with st.expander(name):
+                primary = exercise.get("primary_muscle") or "Not specified"
+                secondary = exercise.get("secondary_muscles") or []
+                equipment = exercise.get("equipment") or []
+
+                col_a, col_b, col_c = st.columns(3)
+
+                col_a.metric("Primary muscle", primary.replace("_", " ").title())
+
+                col_b.metric(
+                    "Movement pattern",
+                    (exercise.get("pattern") or "Not specified")
+                    .replace("_", " ").title(),
+                )
+
+                col_c.metric(
+                    "Training category",
+                    (exercise.get("modality") or "Not specified").title(),
+                )
+
+                st.markdown(
+                    "**Secondary muscles:** "
+                    + (
+                        ", ".join(
+                            muscle.replace("_", " ").title()
+                            for muscle in secondary
+                        )
+                        if secondary else "Not specified"
                     )
-                    if secondary else "Not specified"
                 )
-            )
 
-            st.markdown(
-                "**Equipment:** "
-                + (
-                    ", ".join(
-                        item.replace("_", " ").title()
-                        for item in equipment
+                st.markdown(
+                    "**Equipment:** "
+                    + (
+                        ", ".join(
+                            item.replace("_", " ").title()
+                            for item in equipment
+                        )
+                        if equipment else "Not specified"
                     )
-                    if equipment else "Not specified"
-                )
-            )
-
-            rep_low = exercise.get("default_rep_low")
-            rep_high = exercise.get("default_rep_high")
-
-            if rep_low is not None and rep_high is not None:
-                st.markdown(
-                    f"**Suggested repetitions:** {rep_low}–{rep_high}"
                 )
 
-            if exercise.get("sfr_class"):
-                st.markdown(
-                    f"**Stimulus-to-fatigue category:** "
-                    f"{exercise['sfr_class'].title()}"
+                rep_low = exercise.get("default_rep_low")
+                rep_high = exercise.get("default_rep_high")
+
+                if rep_low is not None and rep_high is not None:
+                    st.markdown(
+                        f"**Suggested repetitions:** {rep_low}–{rep_high}"
+                    )
+
+                if exercise.get("sfr_class"):
+                    st.markdown(
+                        f"**Stimulus-to-fatigue category:** "
+                        f"{exercise['sfr_class'].title()}"
+                    )
+
+                if exercise.get("tier"):
+                    st.markdown(
+                        f"**Exercise tier:** {exercise['tier'].title()}"
+                    )
+
+                if exercise.get("is_gold_standard"):
+                    st.success("Marked as a gold-standard exercise by the API.")
+
+                if exercise.get("cues"):
+                    st.markdown("**Coaching cues**")
+                    st.write(exercise["cues"])
+
+                st.caption(f"Online exercise ID: {exercise.get('id', 'N/A')}")
+
+        # Load more results from the online API.
+        if offset + len(online_exercises) < total_online:
+            if st.button("Load More Online Exercises"):
+                st.session_state["online_exercise_offset"] = (
+                    offset + page_size
                 )
+                st.rerun()
 
-            if exercise.get("tier"):
-                st.markdown(
-                    f"**Exercise tier:** {exercise['tier'].title()}"
-                )
-
-            if exercise.get("is_gold_standard"):
-                st.success("Marked as a gold-standard exercise by the API.")
-
-            if exercise.get("cues"):
-                st.markdown("**Coaching cues**")
-                st.write(exercise["cues"])
-
-            st.caption(f"Online exercise ID: {exercise.get('id', 'N/A')}")
-
-    # Load more results from the online API.
-    if offset + len(online_exercises) < total_online:
-        if st.button("Load More Online Exercises"):
-            st.session_state["online_exercise_offset"] = (
-                offset + page_size
-            )
-            st.rerun()
-
-except Exception as error:
-    st.error(f"Could not load online exercises: {error}")
-
+    except Exception as error:
+        st.error(f"Could not load online exercises: {error}")
+else:
+    st.info("Enter an exercise name, muscle, or equipment above to search the online database.")
 
 st.divider()
 

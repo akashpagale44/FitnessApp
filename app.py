@@ -26,7 +26,12 @@ st.set_page_config(
     layout="wide"
 )
 
-initialize_library()
+@st.cache_resource
+def initialize_app_library():
+    initialize_library()
+
+
+initialize_app_library()
 
 
 
