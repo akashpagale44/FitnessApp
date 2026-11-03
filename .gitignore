@@ -14,3 +14,9 @@ backups/
 
 # Streamlit secrets
 .streamlit/secrets.toml
+
+# Temporary backups and SQLite sidecar files
+*.backup*
+*.before_*
+*.db-wal
+*.db-shm
