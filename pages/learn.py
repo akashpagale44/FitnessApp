@@ -1,19 +1,16 @@
 from auth import restore_login_session
 
-import sqlite3
-from pathlib import Path
 from datetime import datetime
 
 import pandas as pd
 import streamlit as st
 
+from database import get_connection
+
 
 # =========================
 # DATABASE SETUP
 # =========================
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-DATABASE_PATH = BASE_DIR / "data" / "fitness.db"
 
 restore_login_session()
 
@@ -24,30 +21,10 @@ if not st.session_state.get("authenticated", False) or "user_id" not in st.sessi
 user_id = st.session_state.user_id
 
 
-def get_connection():
-    """Connect to the existing fitness database."""
-    return sqlite3.connect(DATABASE_PATH)
-
-
-def initialize_quiz_database():
-    """Create quiz history storage if it does not exist."""
-    with get_connection() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS quiz_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                score INTEGER NOT NULL,
-                total_questions INTEGER NOT NULL,
-                attempted_at TEXT NOT NULL
-            )
-            """
-        )
-
-
 def save_quiz_score(score, total_questions):
-    """Save a completed quiz attempt permanently."""
-    with get_connection() as connection:
+    """Save a completed quiz attempt using the shared database."""
+    connection = get_connection()
+    try:
         connection.execute(
             """
             INSERT INTO quiz_logs
@@ -61,12 +38,15 @@ def save_quiz_score(score, total_questions):
                 datetime.now().isoformat(timespec="seconds")
             )
         )
+    finally:
+        connection.close()
 
 
 def get_quiz_history():
-    """Return the latest 10 quiz attempts."""
-    with get_connection() as connection:
-        return pd.read_sql_query(
+    """Return the latest 10 quiz attempts from the shared database."""
+    connection = get_connection()
+    try:
+        rows = connection.execute(
             """
             SELECT score, total_questions, attempted_at
             FROM quiz_logs
@@ -74,12 +54,22 @@ def get_quiz_history():
             ORDER BY attempted_at DESC, id DESC
             LIMIT 10
             """,
-            connection,
-            params=(user_id,)
+            (user_id,)
+        ).fetchall()
+
+        return pd.DataFrame(
+            [
+                {
+                    "score": row["score"],
+                    "total_questions": row["total_questions"],
+                    "attempted_at": row["attempted_at"]
+                }
+                for row in rows
+            ],
+            columns=["score", "total_questions", "attempted_at"]
         )
-
-
-initialize_quiz_database()
+    finally:
+        connection.close()
 
 
 # =========================
