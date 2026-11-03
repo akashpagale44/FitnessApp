@@ -2,7 +2,7 @@ from auth import restore_login_session
 import streamlit as st
 import pandas as pd
 
-from database import get_user, get_today_workout_count, get_connection
+from database import get_connection
 from calculations import (
     calculate_bmr,
     calculate_tdee,
@@ -44,10 +44,63 @@ st.write("Your personal fitness overview")
 
 
 # =========================
-# GET USER
+# LOAD DASHBOARD DATA
 # =========================
 
-user = get_user(user_id)
+connection = get_connection()
+
+try:
+    cursor = connection.cursor()
+
+    cursor.execute(
+        "SELECT * FROM users WHERE id = ?",
+        (user_id,)
+    )
+    user = cursor.fetchone()
+
+    if user is not None:
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM workout_logs
+            WHERE user_id = ?
+            AND date = DATE('now')
+            """,
+            (user_id,)
+        )
+        workout_count = cursor.fetchone()[0]
+
+        cursor.execute(
+            """
+            SELECT
+                COALESCE(SUM(calories), 0),
+                COALESCE(SUM(protein), 0)
+            FROM nutrition_logs
+            WHERE user_id = ?
+            AND date = DATE('now')
+            """,
+            (user_id,)
+        )
+        nutrition = cursor.fetchone()
+
+        cursor.execute(
+            """
+            SELECT date, weight
+            FROM weight_logs
+            WHERE user_id = ?
+            ORDER BY date
+            """,
+            (user_id,)
+        )
+        weight_rows = cursor.fetchall()
+
+        weight_data = pd.DataFrame(
+            weight_rows,
+            columns=["date", "weight"]
+        )
+
+finally:
+    connection.close()
 
 if user is None:
     st.error("Please create your profile first.")
@@ -79,35 +132,6 @@ protein_target = calculate_protein_target(
     user["weight"]
 )
 
-workout_count = get_today_workout_count(user_id)
-
-
-# =========================
-# TODAY'S NUTRITION
-# =========================
-
-connection = get_connection()
-
-try:
-    cursor = connection.cursor()
-
-    cursor.execute(
-        """
-        SELECT
-            COALESCE(SUM(calories), 0),
-            COALESCE(SUM(protein), 0)
-        FROM nutrition_logs
-        WHERE user_id = ?
-        AND date = DATE('now')
-        """,
-        (user_id,)
-    )
-
-    nutrition = cursor.fetchone()
-
-finally:
-    connection.close()
-
 calories_consumed = float(nutrition[0] or 0)
 protein_consumed = float(nutrition[1] or 0)
 
@@ -125,27 +149,6 @@ protein_remaining = max(
 # =========================
 # WEIGHT HISTORY
 # =========================
-
-connection = get_connection()
-
-try:
-    cursor = connection.cursor()
-    cursor.execute(
-        """
-        SELECT date, weight
-        FROM weight_logs
-        WHERE user_id = ?
-        ORDER BY date
-        """,
-        (user_id,)
-    )
-    weight_rows = cursor.fetchall()
-    weight_data = pd.DataFrame(
-        weight_rows,
-        columns=["date", "weight"]
-    )
-finally:
-    connection.close()
 
 goal_weight = float(user["goal_weight"])
 
